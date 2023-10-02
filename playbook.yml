@@ -1,0 +1,108 @@
+---
+- name: Rodar servidor de minecraft
+  hosts: server
+  become: true
+  tasks:
+    - name: Lendo informações do disco
+      community.general.parted:
+        device: /dev/xvde
+      register: disk_info
+
+    - name: Particionar disco do servidor
+      community.general.parted:
+        device: /dev/xvde
+        number: 1
+        state: present
+      when: disk_info.partitions is not defined
+
+    - name: Definir File System Type disco do servidor
+      community.general.filesystem:
+        fstype: ext4
+        dev: /dev/xvde
+
+    - name: Montar disco do servidor
+      ansible.posix.mount:
+        src: /dev/xvde
+        path: /mnt/server
+        fstype: ext4
+        state: mounted
+
+    - name: Atualizar pacotes
+      ansible.builtin.yum:
+        name: "*"
+        state: latest
+
+    - name: Instalando Java
+      ansible.builtin.yum:
+        name: java-1.8.0-amazon-corretto-devel
+        state: latest
+
+    - name: Enviando zip do servidor
+      ansible.builtin.copy:
+        src: "SkyFactory-4_Server_4_2_4.zip"
+        dest: /mnt/server/sky-factory.zip
+        force: false
+
+    - name: Criar pasta do servidor
+      ansible.builtin.file:
+        path: /mnt/server/servidor
+        state: directory
+
+    - name: Verifica se o arquivo já foi descompactado
+      ansible.builtin.stat:
+        path: /mnt/server/servidor/server.properties
+      register: unzipped
+      ignore_errors: true
+
+    - name: Descompactando zip do servidor
+      ansible.builtin.unarchive:
+        src: /mnt/server/sky-factory.zip
+        dest: /mnt/server/servidor
+        remote_src: true
+      when: not unzipped.stat.exists
+
+    - name: Configurando servidor
+      ansible.builtin.lineinfile:
+        path: /mnt/server/servidor/settings.sh
+        regexp: "{{ item.regex }}"
+        line: 'export {{ item.regex }}="{{ item.value }}"'
+      with_items:
+        - regex: "MIN_RAM"
+          value: "1024M"
+        - regex: "MAX_RAM"
+          value: "8192M"
+
+    - name: Instalando dependências do servidor
+      ansible.builtin.command:
+        cmd: sh Install.sh
+        chdir: /mnt/server/servidor
+
+    - name: Configurando regras do servidor
+      ansible.builtin.copy:
+        src: server.properties
+        dest: /mnt/server/servidor/server.properties
+
+    - name: Aceitando EULA
+      ansible.builtin.copy:
+        content: "eula=true"
+        dest: /mnt/server/servidor/eula.txt
+
+    - name: Verifica se o world data existe
+      ansible.builtin.stat:
+        path: /mnt/server/servidor/world
+      register: world_data
+      ignore_errors: true
+
+    - name: Importando world data
+      ansible.builtin.copy:
+        src: world-two/
+        dest: /mnt/server/servidor/world/
+      when: world_data.stat.exists
+
+    - name: Inicializando servidor
+      ansible.builtin.command:
+        cmd: "sh ServerStart.sh"
+        chdir: /mnt/server/servidor
+      async: 86400
+      poll: 0
+      become: true

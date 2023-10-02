@@ -1,0 +1,26 @@
+---
+- name: Terminando servidor de minecraft
+  hosts: server
+  become: true
+  tasks:
+    - name: Instalando pip
+      ansible.builtin.yum:
+        name: python-pip
+        state: latest
+
+    - name: Instalando psutil
+      ansible.builtin.pip:
+        name: psutil
+        state: latest
+
+    - name: Pegando o Process ID do servidor
+      community.general.pids:
+        name: java
+      register: pid
+      ignore_errors: true
+
+    - name: Parar servidor
+      ansible.builtin.command:
+        cmd: kill -9 {{ pid.pids[0] }}
+      when: pid is defined
+      ignore_errors: true
