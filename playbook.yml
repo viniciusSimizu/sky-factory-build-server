@@ -39,7 +39,7 @@
 
     - name: Enviando zip do servidor
       ansible.builtin.copy:
-        src: "SkyFactory-4_Server_4_2_4.zip"
+        src: "data/SkyFactory-4_Server_4_2_4.zip"
         dest: /mnt/server/sky-factory.zip
         force: false
 
@@ -79,7 +79,7 @@
 
     - name: Configurando regras do servidor
       ansible.builtin.copy:
-        src: server.properties
+        src: data/server.properties
         dest: /mnt/server/servidor/server.properties
 
     - name: Aceitando EULA
@@ -95,7 +95,7 @@
 
     - name: Importando world data
       ansible.builtin.copy:
-        src: world-two/
+        src: data/world-two/
         dest: /mnt/server/servidor/world/
       when: world_data.stat.exists
 
